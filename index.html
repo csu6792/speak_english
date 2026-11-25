@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>英文朗讀器</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f3f6f4; --surface:#ffffff; --ink:#16231f; --muted:#5b6b65; --line:#cfdad5;
+  --accent:#0f6b57; --accent-ink:#ffffff; --sent:#e3f1ec; --word:#ffd54a; --word-ink:#2b2100; --danger:#b3261e;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1815; --surface:#18241f; --ink:#e6efeb; --muted:#93a59d; --line:#2c3d36;
+    --accent:#4cc3a4; --accent-ink:#06211a; --sent:#213a32; --word:#e8b923; --word-ink:#1d1600; --danger:#ff8a80; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1815; --surface:#18241f; --ink:#e6efeb; --muted:#93a59d; --line:#2c3d36;
+  --accent:#4cc3a4; --accent-ink:#06211a; --sent:#213a32; --word:#e8b923; --word-ink:#1d1600; --danger:#ff8a80; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6}
+main{max-width:720px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.4rem;margin:0 0 4px;font-weight:700;display:flex;align-items:center;gap:8px}
+h2{font-size:1rem;margin:0;font-weight:700;display:flex;align-items:center;gap:6px}
+.sub{margin:0 0 16px;color:var(--muted);font-size:.9rem}
+.ic{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic .f{fill:currentColor;stroke:none}
+textarea{width:100%;min-height:150px;resize:vertical;padding:12px;font:1.05rem/1.6 Georgia,"Times New Roman",serif;
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px}
+textarea:focus,select:focus,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  background:var(--surface);color:var(--ink);padding:10px 14px;min-height:44px}
+button.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;flex:1 1 120px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:14px}
+label{display:block;font-size:.9rem;color:var(--muted);margin-bottom:4px}
+select{width:100%;padding:10px;font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px}
+.slider{margin-top:14px}
+.slider .top{display:flex;justify-content:space-between;align-items:baseline}
+.slider .top b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent);margin:6px 0 0}
+.chk{display:flex;gap:8px;align-items:center;margin-top:10px}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+.chk label{margin:0}
+#reader{display:none;margin-top:14px;padding:12px;max-height:280px;overflow:auto;position:relative;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;font:1.1rem/1.9 Georgia,"Times New Roman",serif}
+#reader.on{display:block}
+#reader .s{cursor:pointer;border-radius:4px;padding:1px 0}
+#reader .s.cur{background:var(--sent)}
+#reader mark{background:var(--word);color:var(--word-ink);border-radius:4px;padding:1px 2px}
+#status{margin-top:8px;font-size:.85rem;color:var(--muted)}
+.bar{height:6px;background:var(--line);border-radius:3px;margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.warn{color:var(--danger);font-size:.9rem;margin-top:10px}
+.hhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hhead button{min-height:36px;padding:6px 10px;font-size:.85rem}
+#hist{margin-top:8px}
+.h{display:flex;gap:6px;align-items:stretch;border-top:1px solid var(--line);padding:8px 0}
+.h .load{flex:1;min-width:0;text-align:left;justify-content:flex-start;border:0;background:transparent;padding:4px 6px;min-height:44px;flex-direction:column;align-items:flex-start;gap:0}
+.h .t{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:Georgia,serif}
+.h .m{font-size:.78rem;color:var(--muted)}
+.h .del{min-height:44px;width:44px;padding:0;color:var(--muted)}
+.empty{color:var(--muted);font-size:.9rem;padding:8px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z" class="f"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>英文朗讀器</h1>
+  <p class="sub">貼上英文，選擇聲音與語速，按播放即可。使用瀏覽器／系統內建語音。</p>
+
+  <textarea id="text" placeholder="在這裡貼上英文文字…" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="paste" type="button" data-ic="paste">貼上剪貼簿</button>
+    <button id="clear" type="button" data-ic="trash">清除</button>
+  </div>
+
+  <div class="row">
+    <button id="prev" type="button" title="上一句" aria-label="上一句" data-ic="prev"></button>
+    <button id="play" class="main" type="button"></button>
+    <button id="stop" type="button" data-ic="stop">停止</button>
+    <button id="next" type="button" title="下一句" aria-label="下一句" data-ic="next"></button>
+  </div>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="status">準備就緒</div>
+
+  <div id="reader" aria-live="off"></div>
+
+  <div class="panel">
+    <label for="voice">人聲</label>
+    <select id="voice"></select>
+    <div class="chk"><input type="checkbox" id="all"><label for="all">顯示所有語言的聲音</label></div>
+    <div class="slider">
+      <div class="top"><label for="rate" style="margin:0">語速</label><b id="rateV">1×</b></div>
+      <input type="range" id="rate" min="0.2" max="2" step="0.05" value="1">
+    </div>
+    <div class="slider">
+      <div class="top"><label for="pitch" style="margin:0">音調</label><b id="pitchV">1</b></div>
+      <input type="range" id="pitch" min="0.5" max="1.5" step="0.05" value="1">
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hhead">
+      <h2 id="hh"></h2>
+      <button id="hclear" type="button">清空紀錄</button>
+    </div>
+    <div id="hist"></div>
+  </div>
+  <div id="warn" class="warn" hidden></div>
+</main>
+
+<script>
+(function(){
+  var ICONS = {
+    play:'<polygon points="7 4 20 12 7 20 7 4" class="f"/>',
+    pause:'<rect x="6" y="4" width="4.5" height="16" rx="1" class="f"/><rect x="13.5" y="4" width="4.5" height="16" rx="1" class="f"/>',
+    stop:'<rect x="5" y="5" width="14" height="14" rx="2" class="f"/>',
+    prev:'<polygon points="19 5 9 12 19 19 19 5" class="f"/><line x1="5" y1="5" x2="5" y2="19"/>',
+    next:'<polygon points="5 5 15 12 5 19 5 5" class="f"/><line x1="19" y1="5" x2="19" y2="19"/>',
+    paste:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/>',
+    trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+    x:'<path d="M6 6l12 12M18 6 6 18"/>',
+    hist:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'
+  };
+  function ic(n){ return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+ICONS[n]+'</svg>'; }
+
+  var synth = window.speechSynthesis;
+  var $ = function(id){ return document.getElementById(id); };
+  var el = { text:$('text'), voice:$('voice'), all:$('all'), rate:$('rate'), pitch:$('pitch'),
+    rateV:$('rateV'), pitchV:$('pitchV'), play:$('play'), stop:$('stop'), prev:$('prev'), next:$('next'),
+    paste:$('paste'), clear:$('clear'), reader:$('reader'), status:$('status'), bar:$('bar'), warn:$('warn'),
+    hist:$('hist'), hclear:$('hclear') };
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ic]'), function(b){
+    b.innerHTML = ic(b.getAttribute('data-ic')) + b.innerHTML;
+  });
+  $('hh').innerHTML = ic('hist') + '朗讀紀錄';
+
+  function save(k,v){ try{ localStorage.setItem('tts:'+k, v); }catch(e){} }
+  function load(k){ try{ return localStorage.getItem('tts:'+k); }catch(e){ return null; } }
+
+  if(!synth || typeof SpeechSynthesisUtterance === 'undefined'){
+    el.warn.hidden = false;
+    el.warn.textContent = '這個瀏覽器不支援語音朗讀，請改用 Chrome、Edge 或 Safari。';
+    el.play.disabled = true; return;
+  }
+
+  var voices = [], chunks = [], spans = [], idx = 0, session = 0, state = 'idle', dirty = false;
+
+  /* ---------- voices ---------- */
+  function loadVoices(){
+    voices = synth.getVoices();
+    var list = voices.filter(function(v){ return el.all.checked || /^en/i.test(v.lang); });
+    if(!list.length) list = voices;
+    var want = el.voice.value || load('voice');
+    el.voice.innerHTML = '';
+    list.forEach(function(v){
+      var o = document.createElement('option');
+      o.value = v.voiceURI;
+      o.textContent = v.name + '（' + v.lang + '）' + (v.localService ? '' : ' 線上');
+      el.voice.appendChild(o);
+    });
+    if(want && list.some(function(v){ return v.voiceURI === want; })) el.voice.value = want;
+    else {
+      var pref = list.find(function(v){ return /^en[-_]US/i.test(v.lang); }) || list[0];
+      if(pref) el.voice.value = pref.voiceURI;
+    }
+  }
+  loadVoices();
+  if(synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+  setTimeout(loadVoices, 500);
+  function currentVoice(){ return voices.find(function(v){ return v.voiceURI === el.voice.value; }) || null; }
+
+  /* ---------- text to chunks ---------- */
+  function split(text){
+    var t = text.replace(/[ \t]+/g,' ').trim();
+    if(!t) return [];
+    var parts = t.match(/[^.!?\n]+(?:[.!?]+["”’)\]]*|\n+|$)/g) || [t];
+    var out = [];
+    parts.forEach(function(p){
+      p = p.trim(); if(!p) return;
+      while(p.length > 220){
+        var cut = p.lastIndexOf(',',220); if(cut < 60) cut = p.lastIndexOf(' ',220); if(cut < 1) cut = 220;
+        out.push(p.slice(0,cut+1).trim()); p = p.slice(cut+1).trim();
+      }
+      if(p) out.push(p);
+    });
+    return out;
+  }
+
+  /* ---------- reader view and highlight ---------- */
+  function renderReader(){
+    el.reader.innerHTML = ''; spans = [];
+    chunks.forEach(function(c,i){
+      var s = document.createElement('span');
+      s.className = 's'; s.textContent = c; s.onclick = function(){ startAt(i); };
+      spans.push(s);
+      el.reader.appendChild(s);
+      el.reader.appendChild(document.createTextNode(' '));
+    });
+    el.reader.classList.add('on');
+  }
+  function ensure(n){
+    var t = n.offsetTop, b = t + n.offsetHeight, v = el.reader.scrollTop, h = el.reader.clientHeight;
+    if(t < v + 8 || b > v + h - 8) el.reader.scrollTop = Math.max(0, t - h / 3);
+  }
+  function setSentence(i){
+    spans.forEach(function(s,k){ s.classList.toggle('cur', k === i); if(k !== i && s.firstChild && s.firstChild.nodeType !== 3) s.textContent = chunks[k]; });
+    var s = spans[i]; if(!s) return;
+    s.textContent = chunks[i];
+    ensure(s);
+  }
+  function markWord(i, start, len){
+    var s = spans[i], txt = chunks[i]; if(!s || start == null) return;
+    if(!len){ var m = /^\S+/.exec(txt.slice(start)); len = m ? m[0].length : 1; }
+    var w = txt.substr(start, len).replace(/[^A-Za-z0-9\u00C0-\u024F]+$/,'');
+    if(!w) return;
+    s.textContent = '';
+    s.appendChild(document.createTextNode(txt.slice(0,start)));
+    var mk = document.createElement('mark'); mk.textContent = w; s.appendChild(mk);
+    s.appendChild(document.createTextNode(txt.slice(start + w.length)));
+    ensure(mk);
+  }
+
+  /* ---------- playback ---------- */
+  function ui(){
+    el.play.innerHTML = state === 'playing' ? ic('pause')+'暫停' : state === 'paused' ? ic('play')+'繼續' : ic('play')+'播放';
+    el.stop.disabled = el.prev.disabled = el.next.disabled = state === 'idle';
+    el.bar.style.width = chunks.length ? Math.min(100, idx / chunks.length * 100) + '%' : '0';
+    el.status.textContent = state === 'idle' ? '準備就緒'
+      : (state === 'paused' ? '已暫停' : '朗讀中') + '　第 ' + Math.min(idx+1, chunks.length) + ' / ' + chunks.length + ' 句';
+  }
+
+  function speak(my){
+    if(my !== session) return;
+    if(idx >= chunks.length){ finish(); return; }
+    var u = new SpeechSynthesisUtterance(chunks[idx]);
+    var v = currentVoice();
+    if(v){ u.voice = v; u.lang = v.lang; } else u.lang = 'en-US';
+    u.rate = parseFloat(el.rate.value);
+    u.pitch = parseFloat(el.pitch.value);
+    var at = idx;
+    u.onboundary = function(e){
+      if(my !== session) return;
+      if(e.name && e.name !== 'word') return;
+      markWord(at, e.charIndex, e.charLength);
+    };
+    u.onend = function(){ if(my !== session) return; idx++; speak(my); };
+    u.onerror = function(e){
+      if(my !== session) return;
+      if(e.error === 'interrupted' || e.error === 'canceled') return;
+      idx++; speak(my);
+    };
+    setSentence(idx); ui();
+    synth.speak(u);
+  }
+
+  function startAt(i){
+    if(!chunks.length) return;
+    session++; var my = session;
+    synth.cancel();
+    idx = Math.max(0, Math.min(i, chunks.length - 1));
+    state = 'playing'; dirty = false; ui();
+    setTimeout(function(){ speak(my); }, 60);
+  }
+  function finish(){
+    session++; state = 'idle'; idx = 0; ui();
+    spans.forEach(function(s,k){ s.classList.remove('cur'); s.textContent = chunks[k]; });
+    el.bar.style.width = '100%'; el.status.textContent = '朗讀完成';
+  }
+  function stop(){
+    session++; synth.cancel(); state = 'idle'; idx = 0;
+    spans.forEach(function(s,k){ s.classList.remove('cur'); s.textContent = chunks[k]; });
+    ui();
+  }
+
+  el.play.onclick = function(){
+    if(state === 'idle'){
+      chunks = split(el.text.value);
+      if(!chunks.length){ el.status.textContent = '請先貼上英文文字'; return; }
+      addHistory(el.text.value);
+      renderReader(); startAt(0);
+    } else if(state === 'playing'){
+      synth.pause(); state = 'paused'; ui();
+    } else {
+      state = 'playing';
+      if(dirty || !synth.paused) startAt(idx); else { synth.resume(); ui(); }
+    }
+  };
+  el.stop.onclick = stop;
+  el.prev.onclick = function(){ if(state !== 'idle') startAt(idx - 1); };
+  el.next.onclick = function(){ if(state !== 'idle'){ if(idx + 1 >= chunks.length) stop(); else startAt(idx + 1); } };
+
+  /* ---------- settings ---------- */
+  var timer;
+  function changed(){
+    if(state === 'playing'){ clearTimeout(timer); timer = setTimeout(function(){ startAt(idx); }, 250); }
+    else if(state === 'paused'){ dirty = true; }
+  }
+  el.rate.oninput = function(){ el.rateV.textContent = +parseFloat(el.rate.value).toFixed(2) + '×'; save('rate', el.rate.value); changed(); };
+  el.pitch.oninput = function(){ el.pitchV.textContent = +parseFloat(el.pitch.value).toFixed(2); save('pitch', el.pitch.value); changed(); };
+  el.voice.onchange = function(){ save('voice', el.voice.value); changed(); };
+  el.all.onchange = loadVoices;
+  var r = load('rate'), p = load('pitch');
+  if(r) el.rate.value = r; if(p) el.pitch.value = p;
+  el.rate.oninput(); el.pitch.oninput();
+
+  /* ---------- history ---------- */
+  var memHist = [];
+  function getHist(){
+    try{ var h = JSON.parse(load('history') || 'null'); if(Array.isArray(h)) return h; }catch(e){}
+    return memHist;
+  }
+  function setHist(h){ memHist = h; save('history', JSON.stringify(h)); }
+  function addHistory(text){
+    var t = text.trim(); if(!t) return;
+    var h = getHist().filter(function(x){ return x.text !== t; });
+    h.unshift({ text:t, ts:Date.now() });
+    setHist(h.slice(0,30)); renderHist();
+  }
+  function renderHist(){
+    var h = getHist();
+    el.hist.innerHTML = '';
+    el.hclear.hidden = !h.length;
+    if(!h.length){ var e = document.createElement('div'); e.className = 'empty'; e.textContent = '播放過的文字會自動存在這裡，點一下即可重新載入。'; el.hist.appendChild(e); return; }
+    h.forEach(function(x){
+      var row = document.createElement('div'); row.className = 'h';
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'load';
+      var t = document.createElement('span'); t.className = 't'; t.textContent = x.text.replace(/\s+/g,' ');
+      var m = document.createElement('span'); m.className = 'm';
+      m.textContent = new Date(x.ts).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) + '　' + x.text.length + ' 字元';
+      b.appendChild(t); b.appendChild(m);
+      b.onclick = function(){ stop(); el.reader.classList.remove('on'); el.text.value = x.text; window.scrollTo({top:0,behavior:'smooth'}); };
+      var d = document.createElement('button'); d.type = 'button'; d.className = 'del'; d.setAttribute('aria-label','刪除這筆'); d.innerHTML = ic('x');
+      d.onclick = function(){ setHist(getHist().filter(function(y){ return y.ts !== x.ts; })); renderHist(); };
+      row.appendChild(b); row.appendChild(d); el.hist.appendChild(row);
+    });
+  }
+  el.hclear.onclick = function(){ setHist([]); renderHist(); };
+  renderHist();
+
+  /* ---------- text tools ---------- */
+  el.paste.onclick = function(){
+    var fail = function(){ el.status.textContent = '無法讀取剪貼簿，請長按文字框手動貼上'; };
+    if(navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function(t){ el.text.value = t; el.reader.classList.remove('on'); if(state !== 'idle') stop(); }, fail);
+    else fail();
+  };
+  el.clear.onclick = function(){ el.text.value = ''; stop(); el.reader.classList.remove('on'); el.text.focus(); };
+  el.text.addEventListener('input', function(){ if(state !== 'idle') stop(); el.reader.classList.remove('on'); });
+  window.addEventListener('beforeunload', function(){ synth.cancel(); });
+  ui();
+})();
+</script>
+</body>
+</html>
